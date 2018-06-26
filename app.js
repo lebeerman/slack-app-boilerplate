@@ -34,14 +34,14 @@ app.use(cors({
 
 // MIDDLEWARE
 
-app.get('/', (req, res) => {
+app.get('/', (req, res, next) => {
   res.send('Just in the /. Lots of cleanup to do... all this tutorial boilerplate is sloppy. Ew.');
   console.log('In the base / route... try "/send-me-buttons".')
 })
 
 // This route handles get request to a /oauth endpoint. 
 // We'll use this endpoint for handling the logic of the Slack oAuth process behind our app.
-app.get('/oauth', (req, res) => {
+app.get('/oauth', (req, res, next) => {
   // When a user authorizes an app, a code query parameter is passed on the oAuth endpoint. 
   // If that code is not there, we respond with an error message
   if (!req.query.code) {
@@ -73,8 +73,8 @@ app.get('/oauth', (req, res) => {
 });
 
 // Route the endpoint that our slash command will point to and send back a simple response to indicate that ngrok is working
-app.post('/command', (req, res) => {
-  res.send('Your ngrok tunnel is up and running!');
+app.post('/command', (req, res, next) => {
+  res.send('POST from button click: SUCCESS. Your ngrok tunnel is up and running!');
 });
 app.post('/send-me-buttons', urlencodedParser, (req, res) => {
   res.status(200).end(); // best practice to respond with empty 200 status code
@@ -84,31 +84,37 @@ app.post('/send-me-buttons', urlencodedParser, (req, res) => {
     res.status(403).end("Access forbidden");
   } else {
     var message = {
-      "text": "Welcome to the wild world of Slack Messages!",
+      "text": "Would you like to play a game?",
       "attachments": [{
-        "text": "Here's some test buttons... this will need to be put into a chron trigger",
-        "fallback": "Shame... buttons aren't supported in this land",
-        "callback_id": "button_tutorial",
-        "color": "#3AA3E3",
+        "text": "Choose a game to play",
+        "fallback": "You are unable to choose a game",
+        "callback_id": "wopr_game",
+        "color": "#434343",
         "attachment_type": "default",
         "actions": [{
-            "name": "yes",
-            "text": "yes",
+            "name": "game",
+            "text": "Chess",
             "type": "button",
-            "value": "yes"
+            "value": "chess"
           },
           {
-            "name": "no",
-            "text": "no",
+            "name": "game",
+            "text": "Falken's Maze",
             "type": "button",
-            "value": "no"
+            "value": "maze"
           },
           {
-            "name": "maybe",
-            "text": "maybe",
+            "name": "game",
+            "text": "Thermonuclear War",
+            "style": "danger",
             "type": "button",
-            "value": "maybe",
-            "style": "danger"
+            "value": "war",
+            "confirm": {
+              "title": "Are you sure?",
+              "text": "Wouldn't you prefer a good game of chess?",
+              "ok_text": "Yes",
+              "dismiss_text": "No"
+            }
           }
         ]
       }]
@@ -117,10 +123,22 @@ app.post('/send-me-buttons', urlencodedParser, (req, res) => {
   }
 })
 
+// REQUEST URL (Found in Slack Interactive Components) - any additional action should come from helper functions
+app.post('/slack/actions', urlencodedParser, (req, res) => {
+  res.status(200).end() // best practice to respond with 200 status
+  var actionJSONPayload = JSON.parse(req.body.payload) // parse URL-encoded payload JSON string
+  var message = {
+    "text": actionJSONPayload.user.name + " clicked: " + actionJSONPayload.actions[0].name,
+    "replace_original": false
+  }
+  console.log('ROUTE: /slack/actions',actionJSONPayload)
+  sendMessageToSlackResponseURL(actionJSONPayload.response_url, message)
+})
+
 app.use(notFound);
 app.use(errorHandler);
 
-// // We create a function which handles any requests and sends a simple response
+// We create a function which handles any requests and sends a simple response
 function handleRequest(request, response) {
   response.end('Local ngrok is working! -  Path Hit: ' + request.url);
 }
